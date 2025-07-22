@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Workday Tracker</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 650px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+            margin-top: 20px;
+        }
+
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            font-weight: 300;
+            letter-spacing: -1px;
+        }
+
+        .main-action {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        button {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 50px;
+            font-size: 1em;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .summary {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            margin: 25px 0;
+            text-align: center;
+            box-shadow: 0 8px 25px rgba(240, 147, 251, 0.3);
+        }
+
+        .summary p {
+            margin: 8px 0;
+            font-size: 1.1em;
+        }
+
+        .summary strong {
+            font-size: 1.3em;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        }
+
+        .calendar {
+            background: #f8f9fc;
+            padding: 20px;
+            border-radius: 15px;
+            border: 1px solid #e1e8ed;
+        }
+
+        .calendar p {
+            margin: 0 0 15px 0;
+            font-weight: 600;
+            color: #4a5568;
+            font-size: 1.1em;
+        }
+
+        .worked {
+            color: #48bb78;
+            font-weight: bold;
+        }
+
+        .date-input-section {
+            background: linear-gradient(135deg, #ffeaa7 0%, #fab1a0 100%);
+            padding: 25px;
+            border-radius: 15px;
+            margin: 25px 0;
+            box-shadow: 0 8px 25px rgba(255, 234, 167, 0.3);
+        }
+
+        .date-input-section h3 {
+            color: #2d3436;
+            margin: 0 0 20px 0;
+            font-size: 1.3em;
+            font-weight: 600;
+        }
+
+        .date-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+
+        input[type="date"] {
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 1em;
+            background: white;
+            transition: border-color 0.3s ease;
+            min-width: 160px;
+        }
+
+        input[type="date"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .quick-dates {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .quick-dates button {
+            background: linear-gradient(45deg, #74b9ff, #0984e3);
+            font-size: 0.9em;
+            padding: 8px 16px;
+            box-shadow: 0 3px 10px rgba(116, 185, 255, 0.3);
+        }
+
+        .quick-dates button:hover {
+            box-shadow: 0 4px 15px rgba(116, 185, 255, 0.4);
+        }
+
+        .worked-days-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 15px;
+        }
+
+        .worked-day-item {
+            background: linear-gradient(135deg, #a8e6cf 0%, #7fcdcd 100%);
+            padding: 10px 15px;
+            border-radius: 25px;
+            font-size: 0.9em;
+            color: #2d3436;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 3px 10px rgba(168, 230, 207, 0.3);
+            transition: transform 0.2s ease;
+        }
+
+        .worked-day-item:hover {
+            transform: translateY(-1px);
+        }
+
+        .worked-day-item button {
+            background: linear-gradient(45deg, #e74c3c, #c0392b);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            margin: 0;
+            box-shadow: 0 2px 5px rgba(231, 76, 60, 0.3);
+        }
+
+        .worked-day-item button:hover {
+            transform: scale(1.1);
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .container {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 2em;
+            }
+
+            .date-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            input[type="date"] {
+                min-width: auto;
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>📅 Workday Tracker</h1>
+        <div class="main-action">
+            <button onclick="logToday()">✅ I worked today</button>
+        </div>
+
+        <div class="date-input-section">
+            <h3>📝 Log a previous workday</h3>
+            <div class="date-controls">
+                <input type="date" id="dateInput" max="">
+                <button onclick="logSelectedDate()">Add Workday</button>
+            </div>
+            <div class="quick-dates">
+                <button onclick="setDateAndLog(-1)">Yesterday</button>
+                <button onclick="setDateAndLog(-2)">2 days ago</button>
+                <button onclick="setDateAndLog(-3)">3 days ago</button>
+                <button onclick="setDateAndLog(-7)">1 week ago</button>
+            </div>
+        </div>
+
+        <div class="summary" id="summary"></div>
+        <div class="calendar" id="calendar"></div>
+    </div>
+
+    <script>
+        async function logToday() {
+            const res = await fetch("/api/log", { method: "POST" });
+            const data = await res.json();
+            if (data.status === "success") {
+                alert(`✅ Logged workday for ${data.date}`);
+            }
+            updateSummary();
+        }
+
+        async function logSelectedDate() {
+            const dateInput = document.getElementById('dateInput');
+            const selectedDate = dateInput.value;
+
+            if (!selectedDate) {
+                alert('Please select a date first');
+                return;
+            }
+
+            try {
+                const res = await fetch(`/api/log/${selectedDate}`, { method: "POST" });
+                const data = await res.json();
+
+                if (data.status === "success") {
+                    alert(`✅ Logged workday for ${selectedDate}`);
+                    dateInput.value = ''; // Clear the input
+                } else {
+                    alert(`Error: ${data.message}`);
+                }
+            } catch (error) {
+                alert('Error logging workday');
+            }
+
+            updateSummary();
+        }
+
+        function setDateAndLog(daysOffset) {
+            const date = new Date();
+            date.setDate(date.getDate() + daysOffset);
+
+            // Skip weekends
+            while (date.getDay() === 0 || date.getDay() === 6) {
+                date.setDate(date.getDate() - 1);
+            }
+
+            const dateStr = date.toISOString().split('T')[0];
+            logSpecificDate(dateStr);
+        }
+
+        async function logSpecificDate(dateStr) {
+            try {
+                const res = await fetch(`/api/log/${dateStr}`, { method: "POST" });
+                const data = await res.json();
+
+                if (data.status === "success") {
+                    alert(`✅ Logged workday for ${dateStr}`);
+                } else {
+                    alert(`Error: ${data.message}`);
+                }
+            } catch (error) {
+                alert('Error logging workday');
+            }
+
+            updateSummary();
+        }
+
+        async function removeWorkday(dateStr) {
+            if (!confirm(`Remove workday for ${dateStr}?`)) return;
+
+            try {
+                const res = await fetch(`/api/remove/${dateStr}`, { method: "DELETE" });
+                const data = await res.json();
+
+                if (data.status === "success") {
+                    alert(`🗑️ Removed workday for ${dateStr}`);
+                } else {
+                    alert(`Error: ${data.message}`);
+                }
+            } catch (error) {
+                alert('Error removing workday');
+            }
+
+            updateSummary();
+        }
+
+        function getWeekdaysInMonth(year, month) {
+            const days = [];
+            const date = new Date(year, month, 1);
+            while (date.getMonth() === month) {
+                const day = date.getDay();
+                if (day !== 0 && day !== 6)
+                    days.push(date.toISOString().split('T')[0]);
+                date.setDate(date.getDate() + 1);
+            }
+            return days;
+        }
+
+        async function updateSummary() {
+            const res = await fetch("/api/days");
+            const worked = await res.json();
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = now.getMonth();
+            const allWeekdays = getWeekdaysInMonth(year, month);
+            const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
+            const workedThisMonth = worked.filter(date => date.startsWith(monthPrefix));
+            const percent = ((workedThisMonth.length / allWeekdays.length) * 100).toFixed(1);
+
+            document.getElementById('summary').innerHTML = `
+        <p>Worked: <strong>${workedThisMonth.length}</strong> / ${allWeekdays.length} working days</p>
+        <p>✅ Completion: <strong>${percent}%</strong></p>
+      `;
+
+            // Display worked days with remove buttons
+            const workedDaysHtml = workedThisMonth.length > 0
+                ? workedThisMonth.map(date =>
+                    `<span class="worked-day-item">${date} <button onclick="removeWorkday('${date}')">×</button></span>`
+                ).join('')
+                : '<span>None yet</span>';
+
+            document.getElementById('calendar').innerHTML = `
+        <p>Logged workdays:</p>
+        <div class="worked-days-list">${workedDaysHtml}</div>
+      `;
+        }
+
+        // Set max date to today for the date input
+        document.addEventListener('DOMContentLoaded', function () {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('dateInput').setAttribute('max', today);
+            updateSummary();
+        });
+    </script>
+</body>
+
+</html>

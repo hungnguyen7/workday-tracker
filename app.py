@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, render_template
 import sqlite3
 from datetime import date, datetime
+import os
 
 app = Flask(__name__)
 
@@ -62,4 +63,6 @@ def get_days():
 
 if __name__ == "__main__":
     init_db()
-    app.run(debug=True)
+    # Use environment variable for port (Render requirement)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)

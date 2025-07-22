@@ -207,6 +207,58 @@
             transform: scale(1.1);
         }
 
+        .user-section {
+            margin-bottom: 30px;
+        }
+
+        .user-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+
+        select {
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 1em;
+            background: white;
+            transition: border-color 0.3s ease;
+            flex: 1;
+            min-width: 150px;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        input[type="text"] {
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 1em;
+            background: white;
+            transition: border-color 0.3s ease;
+            flex: 1;
+            min-width: 150px;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .current-user {
+            font-weight: 500;
+            color: #2d3436;
+            text-align: center;
+        }
+
         @media (max-width: 768px) {
             body {
                 padding: 10px;
@@ -225,7 +277,14 @@
                 align-items: stretch;
             }
 
-            input[type="date"] {
+            .user-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            input[type="date"],
+            input[type="text"],
+            select {
                 min-width: auto;
                 width: 100%;
             }
@@ -236,39 +295,153 @@
 <body>
     <div class="container">
         <h1>📅 Workday Tracker</h1>
-        <div class="main-action">
-            <button onclick="logToday()">✅ I worked today</button>
+
+        <div class="user-section">
+            <h3>👤 Select User</h3>
+            <div class="user-controls">
+                <select id="userSelect" onchange="onUserChange()">
+                    <option value="">Select a user...</option>
+                </select>
+                <input type="text" id="newUserInput" placeholder="Or enter new username">
+                <button onclick="setUser()">Set User</button>
+            </div>
+            <p id="currentUser" class="current-user">No user selected</p>
         </div>
 
-        <div class="date-input-section">
-            <h3>📝 Log a previous workday</h3>
-            <div class="date-controls">
-                <input type="date" id="dateInput" max="">
-                <button onclick="logSelectedDate()">Add Workday</button>
+        <div id="workdayContent" style="display: none;">
+            <div class="main-action">
+                <button onclick="logToday()">✅ I worked today</button>
             </div>
-            <div class="quick-dates">
-                <button onclick="setDateAndLog(-1)">Yesterday</button>
-                <button onclick="setDateAndLog(-2)">2 days ago</button>
-                <button onclick="setDateAndLog(-3)">3 days ago</button>
-                <button onclick="setDateAndLog(-7)">1 week ago</button>
-            </div>
-        </div>
 
-        <div class="summary" id="summary"></div>
-        <div class="calendar" id="calendar"></div>
+            <div class="date-input-section">
+                <h3>📝 Log a previous workday</h3>
+                <div class="date-controls">
+                    <input type="date" id="dateInput" max="">
+                    <button onclick="logSelectedDate()">Add Workday</button>
+                </div>
+                <div class="quick-dates">
+                    <button onclick="setDateAndLog(-1)">Yesterday</button>
+                    <button onclick="setDateAndLog(-2)">2 days ago</button>
+                    <button onclick="setDateAndLog(-3)">3 days ago</button>
+                    <button onclick="setDateAndLog(-7)">1 week ago</button>
+                </div>
+            </div>
+
+            <div class="summary" id="summary"></div>
+            <div class="calendar" id="calendar"></div>
+        </div>
     </div>
 
     <script>
+        let currentUsername = localStorage.getItem('workdayUsername') || '';
+
+        async function loadUsers() {
+            try {
+                const res = await fetch("/api/users");
+                const users = await res.json();
+                const userSelect = document.getElementById('userSelect');
+
+                // Store current selection
+                const currentSelection = userSelect.value;
+
+                // Create a Set to avoid duplicates and include current user if not in the list
+                const allUsers = new Set(users);
+                if (currentUsername && !allUsers.has(currentUsername)) {
+                    allUsers.add(currentUsername);
+                }
+
+                // Convert back to array and sort
+                const sortedUsers = Array.from(allUsers).sort();
+
+                userSelect.innerHTML = '<option value="">Select a user...</option>';
+                sortedUsers.forEach(user => {
+                    const option = document.createElement('option');
+                    option.value = user;
+                    option.textContent = user;
+                    userSelect.appendChild(option);
+                });
+
+                // Restore selection if it still exists, or set to current username
+                if (currentUsername && sortedUsers.includes(currentUsername)) {
+                    userSelect.value = currentUsername;
+                } else if (currentSelection && sortedUsers.includes(currentSelection)) {
+                    userSelect.value = currentSelection;
+                }
+            } catch (error) {
+                console.error('Error loading users:', error);
+            }
+        }
+
+        async function setUser() {
+            const userSelect = document.getElementById('userSelect');
+            const newUserInput = document.getElementById('newUserInput');
+
+            const selectedUser = userSelect.value;
+            const newUser = newUserInput.value.trim();
+
+            if (newUser) {
+                currentUsername = newUser;
+                newUserInput.value = '';
+            } else if (selectedUser) {
+                currentUsername = selectedUser;
+            } else {
+                alert('Please select a user or enter a new username');
+                return;
+            }
+
+            localStorage.setItem('workdayUsername', currentUsername);
+            document.getElementById('currentUser').textContent = `Current user: ${currentUsername}`;
+            document.getElementById('workdayContent').style.display = 'block';
+
+            // Refresh user list and update selection (this will now include the new user)
+            await loadUsers();
+
+            // Automatically refresh workday data for the new user
+            await updateSummary();
+        }
+
+        // Function to handle user selection change from dropdown
+        async function onUserChange() {
+            const userSelect = document.getElementById('userSelect');
+            const selectedUser = userSelect.value;
+
+            if (selectedUser && selectedUser !== currentUsername) {
+                currentUsername = selectedUser;
+                localStorage.setItem('workdayUsername', currentUsername);
+                document.getElementById('currentUser').textContent = `Current user: ${currentUsername}`;
+                document.getElementById('workdayContent').style.display = 'block';
+
+                // Automatically refresh workday data for the selected user
+                await updateSummary();
+            }
+        }
+
         async function logToday() {
-            const res = await fetch("/api/log", { method: "POST" });
+            if (!currentUsername) {
+                alert('Please select a user first');
+                return;
+            }
+
+            const res = await fetch("/api/log", {
+                method: "POST",
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: currentUsername })
+            });
             const data = await res.json();
             if (data.status === "success") {
                 alert(`✅ Logged workday for ${data.date}`);
+            } else {
+                alert(`Error: ${data.message}`);
             }
             updateSummary();
         }
 
         async function logSelectedDate() {
+            if (!currentUsername) {
+                alert('Please select a user first');
+                return;
+            }
+
             const dateInput = document.getElementById('dateInput');
             const selectedDate = dateInput.value;
 
@@ -278,7 +451,11 @@
             }
 
             try {
-                const res = await fetch(`/api/log/${selectedDate}`, { method: "POST" });
+                const res = await fetch(`/api/log/${selectedDate}`, {
+                    method: "POST",
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: currentUsername })
+                });
                 const data = await res.json();
 
                 if (data.status === "success") {
@@ -308,8 +485,17 @@
         }
 
         async function logSpecificDate(dateStr) {
+            if (!currentUsername) {
+                alert('Please select a user first');
+                return;
+            }
+
             try {
-                const res = await fetch(`/api/log/${dateStr}`, { method: "POST" });
+                const res = await fetch(`/api/log/${dateStr}`, {
+                    method: "POST",
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: currentUsername })
+                });
                 const data = await res.json();
 
                 if (data.status === "success") {
@@ -325,10 +511,19 @@
         }
 
         async function removeWorkday(dateStr) {
+            if (!currentUsername) {
+                alert('Please select a user first');
+                return;
+            }
+
             if (!confirm(`Remove workday for ${dateStr}?`)) return;
 
             try {
-                const res = await fetch(`/api/remove/${dateStr}`, { method: "DELETE" });
+                const res = await fetch(`/api/remove/${dateStr}`, {
+                    method: "DELETE",
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: currentUsername })
+                });
                 const data = await res.json();
 
                 if (data.status === "success") {
@@ -356,39 +551,64 @@
         }
 
         async function updateSummary() {
-            const res = await fetch("/api/days");
-            const worked = await res.json();
-            const now = new Date();
-            const year = now.getFullYear();
-            const month = now.getMonth();
-            const allWeekdays = getWeekdaysInMonth(year, month);
-            const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
-            const workedThisMonth = worked.filter(date => date.startsWith(monthPrefix));
-            const percent = ((workedThisMonth.length / allWeekdays.length) * 100).toFixed(1);
+            if (!currentUsername) return;
 
-            document.getElementById('summary').innerHTML = `
-        <p>Worked: <strong>${workedThisMonth.length}</strong> / ${allWeekdays.length} working days</p>
-        <p>✅ Completion: <strong>${percent}%</strong></p>
-      `;
+            try {
+                const res = await fetch(`/api/days?username=${encodeURIComponent(currentUsername)}`);
+                const worked = await res.json();
 
-            // Display worked days with remove buttons
-            const workedDaysHtml = workedThisMonth.length > 0
-                ? workedThisMonth.map(date =>
-                    `<span class="worked-day-item">${date} <button onclick="removeWorkday('${date}')">×</button></span>`
-                ).join('')
-                : '<span>None yet</span>';
+                if (worked.status === "error") {
+                    console.error('Error fetching days:', worked.message);
+                    return;
+                }
 
-            document.getElementById('calendar').innerHTML = `
-        <p>Logged workdays:</p>
-        <div class="worked-days-list">${workedDaysHtml}</div>
-      `;
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = now.getMonth();
+                const allWeekdays = getWeekdaysInMonth(year, month);
+                const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
+                const workedThisMonth = worked.filter(date => date.startsWith(monthPrefix));
+                const percent = ((workedThisMonth.length / allWeekdays.length) * 100).toFixed(1);
+
+                document.getElementById('summary').innerHTML = `
+            <p>Worked: <strong>${workedThisMonth.length}</strong> / ${allWeekdays.length} working days</p>
+            <p>✅ Completion: <strong>${percent}%</strong></p>
+          `;
+
+                // Display worked days with remove buttons
+                const workedDaysHtml = workedThisMonth.length > 0
+                    ? workedThisMonth.map(date =>
+                        `<span class="worked-day-item">${date} <button onclick="removeWorkday('${date}')">×</button></span>`
+                    ).join('')
+                    : '<span>None yet</span>';
+
+                document.getElementById('calendar').innerHTML = `
+            <p>Logged workdays:</p>
+            <div class="worked-days-list">${workedDaysHtml}</div>
+          `;
+            } catch (error) {
+                console.error('Error updating summary:', error);
+            }
         }
 
-        // Set max date to today for the date input
-        document.addEventListener('DOMContentLoaded', function () {
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', async function () {
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('dateInput').setAttribute('max', today);
-            updateSummary();
+
+            await loadUsers();
+
+            if (currentUsername) {
+                document.getElementById('currentUser').textContent = `Current user: ${currentUsername}`;
+                document.getElementById('workdayContent').style.display = 'block';
+
+                // Set the dropdown to show the current user
+                const userSelectElement = document.getElementById('userSelect');
+                userSelectElement.value = currentUsername;
+
+                // Automatically load workday data for the current user
+                await updateSummary();
+            }
         });
     </script>
 </body>

@@ -144,23 +144,6 @@
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
 
-        .quick-dates {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-
-        .quick-dates button {
-            background: linear-gradient(45deg, #74b9ff, #0984e3);
-            font-size: 0.9em;
-            padding: 8px 16px;
-            box-shadow: 0 3px 10px rgba(116, 185, 255, 0.3);
-        }
-
-        .quick-dates button:hover {
-            box-shadow: 0 4px 15px rgba(116, 185, 255, 0.4);
-        }
-
         .worked-days-list {
             display: flex;
             flex-wrap: wrap;
@@ -310,7 +293,7 @@
 
         <div id="workdayContent" style="display: none;">
             <div class="main-action">
-                <button onclick="logToday()">✅ I worked today</button>
+                <button id="todayButton" onclick="logToday()">✅ I worked today</button>
             </div>
 
             <div class="date-input-section">
@@ -318,12 +301,6 @@
                 <div class="date-controls">
                     <input type="date" id="dateInput" max="">
                     <button onclick="logSelectedDate()">Add Workday</button>
-                </div>
-                <div class="quick-dates">
-                    <button onclick="setDateAndLog(-1)">Yesterday</button>
-                    <button onclick="setDateAndLog(-2)">2 days ago</button>
-                    <button onclick="setDateAndLog(-3)">3 days ago</button>
-                    <button onclick="setDateAndLog(-7)">1 week ago</button>
                 </div>
             </div>
 
@@ -422,18 +399,39 @@
                 return;
             }
 
-            const res = await fetch("/api/log", {
-                method: "POST",
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: currentUsername })
-            });
-            const data = await res.json();
-            if (data.status === "success") {
-                alert(`✅ Logged workday for ${data.date}`);
-            } else {
-                alert(`Error: ${data.message}`);
+            const todayButton = document.getElementById('todayButton');
+            const originalText = todayButton.textContent;
+
+            // Disable button during request
+            todayButton.disabled = true;
+            todayButton.textContent = '⏳ Logging...';
+
+            try {
+                const res = await fetch("/api/log", {
+                    method: "POST",
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: currentUsername })
+                });
+                const data = await res.json();
+
+                if (data.status === "success") {
+                    alert(`✅ Logged workday for ${data.date}`);
+                    todayButton.textContent = '✅ Already logged today';
+                    todayButton.disabled = true;
+                } else {
+                    alert(`Error: ${data.message}`);
+                    // Re-enable button if there was an error
+                    todayButton.disabled = false;
+                    todayButton.textContent = originalText;
+                }
+            } catch (error) {
+                alert('Error logging workday');
+                // Re-enable button if there was an error
+                todayButton.disabled = false;
+                todayButton.textContent = originalText;
             }
-            updateSummary();
+
+            await updateSummary();
         }
 
         async function logSelectedDate() {
@@ -468,46 +466,7 @@
                 alert('Error logging workday');
             }
 
-            updateSummary();
-        }
-
-        function setDateAndLog(daysOffset) {
-            const date = new Date();
-            date.setDate(date.getDate() + daysOffset);
-
-            // Skip weekends
-            while (date.getDay() === 0 || date.getDay() === 6) {
-                date.setDate(date.getDate() - 1);
-            }
-
-            const dateStr = date.toISOString().split('T')[0];
-            logSpecificDate(dateStr);
-        }
-
-        async function logSpecificDate(dateStr) {
-            if (!currentUsername) {
-                alert('Please select a user first');
-                return;
-            }
-
-            try {
-                const res = await fetch(`/api/log/${dateStr}`, {
-                    method: "POST",
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: currentUsername })
-                });
-                const data = await res.json();
-
-                if (data.status === "success") {
-                    alert(`✅ Logged workday for ${dateStr}`);
-                } else {
-                    alert(`Error: ${data.message}`);
-                }
-            } catch (error) {
-                alert('Error logging workday');
-            }
-
-            updateSummary();
+            await updateSummary();
         }
 
         async function removeWorkday(dateStr) {
@@ -528,6 +487,14 @@
 
                 if (data.status === "success") {
                     alert(`🗑️ Removed workday for ${dateStr}`);
+
+                    // If today's workday was removed, reset the today button
+                    const today = new Date().toISOString().split('T')[0];
+                    if (dateStr === today) {
+                        const todayButton = document.getElementById('todayButton');
+                        todayButton.textContent = '✅ I worked today';
+                        todayButton.disabled = false;
+                    }
                 } else {
                     alert(`Error: ${data.message}`);
                 }
@@ -535,7 +502,7 @@
                 alert('Error removing workday');
             }
 
-            updateSummary();
+            await updateSummary();
         }
 
         function getWeekdaysInMonth(year, month) {
@@ -563,12 +530,23 @@
                 }
 
                 const now = new Date();
+                const today = now.toISOString().split('T')[0];
                 const year = now.getFullYear();
                 const month = now.getMonth();
                 const allWeekdays = getWeekdaysInMonth(year, month);
                 const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
                 const workedThisMonth = worked.filter(date => date.startsWith(monthPrefix));
                 const percent = ((workedThisMonth.length / allWeekdays.length) * 100).toFixed(1);
+
+                // Check if today is already logged and update button state
+                const todayButton = document.getElementById('todayButton');
+                if (worked.includes(today)) {
+                    todayButton.textContent = '✅ Already logged today';
+                    todayButton.disabled = true;
+                } else {
+                    todayButton.textContent = '✅ I worked today';
+                    todayButton.disabled = false;
+                }
 
                 document.getElementById('summary').innerHTML = `
             <p>Worked: <strong>${workedThisMonth.length}</strong> / ${allWeekdays.length} working days</p>

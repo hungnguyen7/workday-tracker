@@ -20,7 +20,8 @@ def get_db_connection():
             port=url.port,
             database=url.path[1:],  # Remove leading slash
             user=url.username,
-            password=url.password
+            password=url.password,
+            sslmode='require'  # Required for cloud databases
         )
     else:
         # Local development fallback

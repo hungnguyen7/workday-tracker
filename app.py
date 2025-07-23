@@ -1,20 +1,51 @@
 from flask import Flask, request, jsonify, render_template
-import sqlite3
+import psycopg2
+import psycopg2.extras
 from datetime import date, datetime
 import os
+from urllib.parse import urlparse
 
 app = Flask(__name__)
 
+# Database configuration
+def get_db_connection():
+    """Get database connection from environment variable or fallback to local"""
+    database_url = os.environ.get('DATABASE_URL')
+    
+    if database_url:
+        # Parse the DATABASE_URL for Render PostgreSQL
+        url = urlparse(database_url)
+        conn = psycopg2.connect(
+            host=url.hostname,
+            port=url.port,
+            database=url.path[1:],  # Remove leading slash
+            user=url.username,
+            password=url.password
+        )
+    else:
+        # Local development fallback
+        conn = psycopg2.connect(
+            host=os.environ.get('DB_HOST', 'localhost'),
+            port=os.environ.get('DB_PORT', '5432'),
+            database=os.environ.get('DB_NAME', 'workdays'),
+            user=os.environ.get('DB_USER', 'postgres'),
+            password=os.environ.get('DB_PASSWORD', '')
+        )
+    
+    return conn
+
 def init_db():
-    with sqlite3.connect("workdays.db") as conn:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS workdays (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT NOT NULL,
-                work_date TEXT NOT NULL,
-                UNIQUE(username, work_date)
-            )
-        """)
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS workdays (
+                    id SERIAL PRIMARY KEY,
+                    username VARCHAR(100) NOT NULL,
+                    work_date DATE NOT NULL,
+                    UNIQUE(username, work_date)
+                )
+            """)
+            conn.commit()
 
 @app.route("/")
 def index():
@@ -30,8 +61,10 @@ def log_today():
     
     today = date.today().isoformat()
     try:
-        with sqlite3.connect("workdays.db") as conn:
-            conn.execute("INSERT OR IGNORE INTO workdays (username, work_date) VALUES (?, ?)", (username, today))
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("INSERT INTO workdays (username, work_date) VALUES (%s, %s) ON CONFLICT (username, work_date) DO NOTHING", (username, today))
+                conn.commit()
         return jsonify({"status": "success", "date": today})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -48,8 +81,10 @@ def log_specific_date(date_str):
         # Validate date format
         datetime.strptime(date_str, '%Y-%m-%d')
         
-        with sqlite3.connect("workdays.db") as conn:
-            conn.execute("INSERT OR IGNORE INTO workdays (username, work_date) VALUES (?, ?)", (username, date_str))
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("INSERT INTO workdays (username, work_date) VALUES (%s, %s) ON CONFLICT (username, work_date) DO NOTHING", (username, date_str))
+                conn.commit()
         return jsonify({"status": "success", "date": date_str})
     except ValueError:
         return jsonify({"status": "error", "message": "Invalid date format. Use YYYY-MM-DD"}), 400
@@ -65,12 +100,16 @@ def remove_workday(date_str):
         return jsonify({"status": "error", "message": "Username is required"}), 400
     
     try:
-        with sqlite3.connect("workdays.db") as conn:
-            cursor = conn.execute("DELETE FROM workdays WHERE username = ? AND work_date = ?", (username, date_str))
-            if cursor.rowcount > 0:
-                return jsonify({"status": "success", "message": f"Removed workday for {date_str}"})
-            else:
-                return jsonify({"status": "error", "message": "Date not found"}), 404
+        # Validate date format
+        datetime.strptime(date_str, '%Y-%m-%d')
+        
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM workdays WHERE username = %s AND work_date = %s", (username, date_str))
+                conn.commit()
+        return jsonify({"status": "success", "date": date_str})
+    except ValueError:
+        return jsonify({"status": "error", "message": "Invalid date format. Use YYYY-MM-DD"}), 400
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -81,17 +120,19 @@ def get_days():
     if not username:
         return jsonify({"status": "error", "message": "Username is required"}), 400
     
-    with sqlite3.connect("workdays.db") as conn:
-        rows = conn.execute("SELECT work_date FROM workdays WHERE username = ?", (username,)).fetchall()
-        days = [r[0] for r in rows]
-    return jsonify(days)
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT work_date FROM workdays WHERE username = %s ORDER BY work_date", (username,))
+            days = [row[0] for row in cur.fetchall()]
+    return jsonify({"days": days})
 
 @app.route("/api/users")
 def get_users():
-    with sqlite3.connect("workdays.db") as conn:
-        rows = conn.execute("SELECT DISTINCT username FROM workdays ORDER BY username").fetchall()
-        users = [r[0] for r in rows]
-    return jsonify(users)
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT DISTINCT username FROM workdays ORDER BY username")
+            users = [row[0] for row in cur.fetchall()]
+    return jsonify({"users": users})
 
 if __name__ == "__main__":
     init_db()

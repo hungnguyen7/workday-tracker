@@ -107,8 +107,11 @@ def remove_workday(date_str):
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("DELETE FROM workdays WHERE username = %s AND work_date = %s", (username, date_str))
-                conn.commit()
-        return jsonify({"status": "success", "date": date_str})
+                if cur.rowcount > 0:
+                    conn.commit()
+                    return jsonify({"status": "success", "message": f"Removed workday for {date_str}"})
+                else:
+                    return jsonify({"status": "error", "message": "Date not found"}), 404
     except ValueError:
         return jsonify({"status": "error", "message": "Invalid date format. Use YYYY-MM-DD"}), 400
     except Exception as e:
@@ -121,19 +124,28 @@ def get_days():
     if not username:
         return jsonify({"status": "error", "message": "Username is required"}), 400
     
-    with get_db_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT work_date FROM workdays WHERE username = %s ORDER BY work_date", (username,))
-            days = [row[0] for row in cur.fetchall()]
-    return jsonify({"days": days})
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT work_date FROM workdays WHERE username = %s ORDER BY work_date", (username,))
+                rows = cur.fetchall()
+                # Convert date objects to ISO format strings
+                days = [row[0].isoformat() if hasattr(row[0], 'isoformat') else str(row[0]) for row in rows]
+        return jsonify(days)
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route("/api/users")
 def get_users():
-    with get_db_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT DISTINCT username FROM workdays ORDER BY username")
-            users = [row[0] for row in cur.fetchall()]
-    return jsonify({"users": users})
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT DISTINCT username FROM workdays ORDER BY username")
+                rows = cur.fetchall()
+                users = [row[0] for row in rows]
+        return jsonify(users)
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == "__main__":
     init_db()
